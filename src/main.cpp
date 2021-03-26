@@ -12,18 +12,43 @@
 // Blinking rate in milliseconds
 #define BLINKING_RATE_MS                                                    1000
 
-// Initialise the digital pin LED1 as an output
-DigitalOut led(LED1);
-// DigitalOut led(PB_0);
+DigitalOut led(PB_0);
 
+//create interruptin object for the button
+InterruptIn BUTTON (USER_BUTTON);
+// InterruptIn BUTTON (PC_13);
 
-int main()
-{
-   while (true) {
-       led = !led;
-       thread_sleep_for(BLINKING_RATE_MS);
-   }
+bool active = false;
+
+//create a ticker object for a recurring interruption
+Ticker blink_ticker;
+
+//Button handler
+void BUTTON_ISR(){
+    active = !active;
+}
+ 
+//Recurrent handler
+void blink_ticker_function(){
+    if(active) {
+      led=!led;
+    }else {
+      led=0;
+    }
 }
 
 
+int main() {
+    //Set up
+  // BUTTON.mode(PullUp);
+
+    // attach the address of the flip function to the rising edge
+  BUTTON.rise(&BUTTON_ISR);  
+    // BUTTON.fall(&BUTTON_ISR);
+  blink_ticker.attach(&blink_ticker_function, 0.5);
+
+  while(1){
+
+  }
+}
 
