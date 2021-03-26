@@ -14,41 +14,21 @@
 
 DigitalOut led(PB_0);
 
-//create interruptin object for the button
-InterruptIn BUTTON (USER_BUTTON);
-// InterruptIn BUTTON (PC_13);
-
-bool active = false;
-
-//create a ticker object for a recurring interruption
-Ticker blink_ticker;
-
-//Button handler
-void BUTTON_ISR(){
-    active = !active;
-}
- 
-//Recurrent handler
-void blink_ticker_function(){
-    if(active) {
-      led=!led;
-    }else {
-      led=0;
-    }
-}
-
 
 int main() {
-    //Set up
-  // BUTTON.mode(PullUp);
+    // creates a queue with the default size
+    EventQueue queue;
 
-    // attach the address of the flip function to the rising edge
-  BUTTON.rise(&BUTTON_ISR);  
-    // BUTTON.fall(&BUTTON_ISR);
-  blink_ticker.attach(&blink_ticker_function, 0.5);
+    // events are simple callbacks
+    queue.call(printf, "called immediately\n");
+    queue.call_in(2000, printf, "called in 2 seconds\n");
+    queue.call_every(1000, printf, "called every 1 seconds\n");
 
-  while(1){
+    // events are executed by the dispatch method
+    queue.dispatch();
 
-  }
+    while(1){
+
+    }
 }
 
