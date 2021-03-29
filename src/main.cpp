@@ -9,26 +9,35 @@
 #include "mbed_events.h"
 #include <stdio.h>
 
-// Blinking rate in milliseconds
-#define BLINKING_RATE_MS                                                    1000
+//create interruptin object for the button
+InterruptIn BUTTON (USER_BUTTON);
+// InterruptIn BUTTON (PC_13);
+bool active = false;
 
-DigitalOut led(PB_0);
+// creates a queue with the default size
+EventQueue queue;
+    
+//Button handler
+void BUTTON_ISR(){
+    active = !active;
+}
+
+void BUTTON_EVENT(){
+  queue.call(printf, "active: %d\n", active);
+}
 
 
 int main() {
-    // creates a queue with the default size
-    EventQueue queue;
-
-    // events are simple callbacks
-    queue.call(printf, "called immediately\n");
-    queue.call_in(2000, printf, "called in 2 seconds\n");
-    queue.call_every(1000, printf, "called every 1 seconds\n");
-
-    // events are executed by the dispatch method
-    queue.dispatch();
+  //when interrupt USER_BUTTON will be occur
+  BUTTON.rise(&BUTTON_EVENT);
+  queue.dispatch();
+  //код после  dispatch(); исполняться не будет (внутри dispatch() цикл while(1))
+  //code after dispatch(); will not be executed (because inside dispatch () while (1) loop))
+  printf("this code will not be executed\n");
 
     while(1){
 
     }
 }
+
 
