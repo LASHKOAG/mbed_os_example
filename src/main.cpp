@@ -44,11 +44,14 @@ void counting(){
 
 
 void for_th(){
+  ThisThread::get_id();
+  queue.call(printf, "thread counting ThisThread::get_id() = %p\n", ThisThread::get_id());
   queue.call(counting);
   queue.dispatch();
 }
 
 void for_th2(){
+  queue2.call(printf, "thread led_inverse ThisThread::get_id() = %p\n", ThisThread::get_id());
   queue2.call_every(50, led_inverse);
   queue2.dispatch();
 }
