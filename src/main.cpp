@@ -2,154 +2,118 @@
  * Copyright (c) 2019 ARM Limited
  * SPDX-License-Identifier: Apache-2.0
  */
-//включаем/выключаем процесс мигания светодиодом по прерыванию кнопки
+
 #include "mbed.h"
 #include "platform/mbed_thread.h"
 
-#include "mbed_events.h"
-#include <stdio.h>
+/*
+ * Copyright (c) 2006-2020 Arm Limited and affiliates.
+ * SPDX-License-Identifier: Apache-2.0
+ */
 
-// #define FLAG_CANCEL_TIMESIGNAL (1U << 0)
-// EventFlags eventFlags;
+typedef struct {
+    float    voltage;   /* AD result of measured voltage */
+    float    current;   /* AD result of measured current */
+    uint32_t counter;   /* A counter value               */
+} message_t;
 
-DigitalOut led(PB_0);
+MemoryPool<message_t, 16> mpool;
+Queue<message_t, 16> queue;
+Thread threadSend;
+Thread threadGet;
 
-// creates a queue with the default size
-EventQueue queue;
-
-EventQueue queue2;
-EventQueue queue3;
-EventQueue queue4;
-Thread thread;
-Thread thread2;  
-Thread thread3; 
-
-int32_t uniqueID = 0;
-bool flag_cancel_timeSignal = 0;
-bool flag_turnOFF_led = 0;
-
-void led_inverse()
+/* Send Thread */
+void send_thread(void)
 {
-  // printf("========== led_inverse() ==========================\n");
-    led = !led;
+    uint32_t i = 0;
+    while (true) {
+        i++; // fake data update
+        message_t *message = mpool.alloc();
+        message->voltage = (i * 0.1) * 33;
+        message->current = (i * 0.1) * 11;
+        message->counter = i;
+        queue.put(message);
+        ThisThread::sleep_for(1000);
+    }
 }
 
-void counting(){
-  if(flag_cancel_timeSignal){return;}
-  printf("---------------  counting()  ----------------------\n");
-  for(uint32_t i = 0; i<=4000000000; ++i){
-    if(flag_cancel_timeSignal){
-      break;
-    }
-    if(i== 10){
-      printf("10\n");
-    }
-    if(i== 1000){
-      printf("1000\n");
-    }
-    if(i== 10000){
-      printf("10000\n");
-    }
-    if(i== 4000000000){
-      printf("4000000000\n");
-    }
-  }
+/* Get message from other thread */
+void get_from_thread(void){
+      while (true) {
+        osEvent evt = queue.get();
+        if (evt.status == osEventMessage) {
+            message_t *message = (message_t *)evt.value.p;
+            printf("\nVoltage: %.2f V\n\r", message->voltage);
+            printf("Current: %.2f A\n\r", message->current);
+            printf("Number of cycles: %u\n\r", message->counter);
+
+            mpool.free(message);
+        }
+      }
 }
 
 
-void for_th(){
-  flag_cancel_timeSignal=0;
-  // while(1){
-    
-    // ThisThread::get_id();
-    // queue.call(printf, "thread counting ThisThread::get_id() = %p\n", ThisThread::get_id());
-    uniqueID = queue.call(counting);
-    // queue.call(printf, "uniqueID = queue.call(counting); = %d\n", uniqueID);
-  // }
+int main(void)
+{
+    threadSend.start(callback(send_thread));
+
+    threadGet.start(callback(get_from_thread));
 
 }
-// void for_blink(){
-//   led=1;
-  // printf("========== for_blink() ==========================\n");
-  // queue3.call_every(50, led_inverse);
-  // if(flag_turnOFF_led){
-  //   queue3.break_dispatch();
-  // }
-  // queue3.dispatch();
+
+
+
+// /* mbed Microcontroller Library
+//  * Copyright (c) 2019 ARM Limited
+//  * SPDX-License-Identifier: Apache-2.0
+//  */
+
+// #include "mbed.h"
+// #include "platform/mbed_thread.h"
+
+// /*
+//  * Copyright (c) 2006-2020 Arm Limited and affiliates.
+//  * SPDX-License-Identifier: Apache-2.0
+//  */
+
+// typedef struct {
+//     float    voltage;   /* AD result of measured voltage */
+//     float    current;   /* AD result of measured current */
+//     uint32_t counter;   /* A counter value               */
+// } message_t;
+
+// MemoryPool<message_t, 16> mpool;
+// Queue<message_t, 16> queue;
+// Thread thread;
+
+// /* Send Thread */
+// void send_thread(void)
+// {
+//     uint32_t i = 0;
+//     while (true) {
+//         i++; // fake data update
+//         message_t *message = mpool.alloc();
+//         message->voltage = (i * 0.1) * 33;
+//         message->current = (i * 0.1) * 11;
+//         message->counter = i;
+//         queue.put(message);
+//         ThisThread::sleep_for(1000);
+//     }
 // }
 
-void for_th2(){
-  int32_t count=0;
-  while(1){
-    count++;
-    ThisThread::sleep_for(2000);
-    flag_cancel_timeSignal = true;
-    queue.call(printf, "count = %d\n", count+=10);
-    queue.call_every(50, led_inverse);
-    
-    // bool result_cancel = queue.cancel(uniqueID);
-    // queue.call(printf, "result_cancel = %d\n", result_cancel);
+// int main(void)
+// {
+//     thread.start(callback(send_thread));
 
-    queue.call(printf, "thread led_inverse ThisThread::get_id() = %p\n", ThisThread::get_id());
-  
-    // queue.call(printf, "try cancel = %d\n", uniqueID);
-  }
+//     while (true) {
+//         osEvent evt = queue.get();
+//         if (evt.status == osEventMessage) {
+//             message_t *message = (message_t *)evt.value.p;
+//             printf("\nVoltage: %.2f V\n\r", message->voltage);
+//             printf("Current: %.2f A\n\r", message->current);
+//             printf("Number of cycles: %u\n\r", message->counter);
 
-  // queue.call_every(50, led_inverse);
-}
-
-void swit(){
-  
-  int value = 0;
-
-  value = 100;
-    while(1){
-      switch (value)
-      {
-      case 100:
-        uniqueID = queue4.call(counting);
-        break;
-
-      case 200:
-        flag_cancel_timeSignal = true;
-        int countt = 0;
-        queue4.call(printf, "countt = %d\n", countt+=10);
-        break;
-
-      // case 300:
-      //   int counttt = 0;
-      //   queue4.call(printf, "counttt = %d\n", counttt+=1000);
-      //   break;
-
-      // default:
-      //   break;
-      }
-      ThisThread::sleep_for(5000);
-      printf( "hello arm\n");
-
-      value =200;
-  }
-}
-
-int main() {
-
-  printf("====================================\n");
-  #ifdef MBED_MAJOR_VERSION
-        printf("Mbed OS version: %d.%d.%d\n\n", MBED_MAJOR_VERSION, MBED_MINOR_VERSION, MBED_PATCH_VERSION);
-  #endif
-
-  // thread.start(for_th);
-
-  // thread2.start(for_th2);
-  // thread3.start(for_blink);
-
-  thread3.start(swit);
-
-  // queue.dispatch();
-  queue4.dispatch();
-  printf("===vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv====\n");
-
-    while(1){ 
-
-    }
-}
+//             mpool.free(message);
+//         }
+//     }
+// }
