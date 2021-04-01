@@ -12,7 +12,7 @@ Thread *(test);
  
 void led2_thread(void const *args) {
     pc.printf("%s\r\n", (char*)args);
-//void led2_thread() {
+ //void led2_thread() {
     while (true) {
         led2 = !led2;        
         ThisThread::sleep_for(1000);       
