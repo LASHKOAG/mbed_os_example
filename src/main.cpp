@@ -1,155 +1,104 @@
+/*
+ * Copyright (c) 2017 - 2020 Arm Limited and affiliates.
+ * SPDX-License-Identifier: Apache-2.0
+ */
 /* mbed Microcontroller Library
  * Copyright (c) 2019 ARM Limited
  * SPDX-License-Identifier: Apache-2.0
  */
-//включаем/выключаем процесс мигания светодиодом по прерыванию кнопки
+
+//SPI slave-master
+/*
+connect GND(slave) <-> GND(master)
+*/
+
+/*code for slave*/
+
 #include "mbed.h"
 #include "platform/mbed_thread.h"
+#include <rtos.h>
+//        thread_sleep_for(BLINKING_RATE_MS);
 
-#include "mbed_events.h"
-#include <stdio.h>
+//for F411
+//SPISlave device(PA_7, PA_6, PA_5, PA_15);
+//DigitalOut drdyOut(PA_10);
 
-// #define FLAG_CANCEL_TIMESIGNAL (1U << 0)
-// EventFlags eventFlags;
+//for L476
+SPISlave device(PA_7, PA_6, PA_5, PA_4);
 
-DigitalOut led(PB_0);
+// SPI_MOSI    = PA_7,
+// SPI_MISO    = PA_6,
+// SPI_SCK     = PA_5,
+// SPI_CS      = PB_6,
+DigitalOut drdyOut(PC_7);
 
-// creates a queue with the default size
-EventQueue queue;
+DigitalOut nss(PA_4);
+uint32_t byte_send = 0;
 
-EventQueue queue2;
-EventQueue queue3;
-EventQueue queue4;
-Thread thread;
-Thread thread2;  
-Thread thread3; 
-
-int32_t uniqueID = 0;
-bool flag_cancel_timeSignal = 0;
-bool flag_turnOFF_led = 0;
-
-void led_inverse()
+int main()
 {
-  // printf("========== led_inverse() ==========================\n");
-    led = !led;
-}
+    printf("\n======================================================\r\n");
 
-void counting(){
-  if(flag_cancel_timeSignal){return;}
-  printf("---------------  counting()  ----------------------\n");
-  for(uint32_t i = 0; i<=4000000000; ++i){
-    if(flag_cancel_timeSignal){
-      break;
+    device.format(8, 3); // Setup:  bit data, high steady state clock, 2nd edge capture
+    // device.frequency(1000000); // 1MHz
+
+    uint8_t *BufferMsv = new uint8_t[3];
+    BufferMsv[0] = 0x6F; //111
+    BufferMsv[1] = 0x64; //100
+    BufferMsv[2] = 0x32; //50
+
+    int v;
+    while (1)
+    {
+        drdyOut = 1;
+        wait_us(1);
+        if (device.receive())
+        {
+            wait_us(1);
+            v = device.read(); // Read byte from master
+            printf("v register = 0x%X\n\r", v);
+            nss = 0;
+            device.reply(v);
+            nss = 1;
+
+            drdyOut = 0;
+        }
+
+        if (BufferMsv != NULL)
+        {
+            delete[] BufferMsv;
+        }
     }
-    if(i== 10){
-      printf("10\n");
+
+    /*code for master*/
+    //H743ZI
+    SPI spi(PD_7, PA_6, PA_5, PA_4); // mosi, miso, sclk, ssel
+    DigitalOut chipSelect(PA_4);
+    InterruptIn drdyIN(PE_3);
+
+    chipSelect = 1;
+    spi.format(8, 3);
+    spi.frequency(1000000); //1MHz
+
+    while (1)
+    {
+        chipSelect = 0;
+
+        // Send 0xAA, the command to read the WHOAMI register
+        int whoami1 = spi.write(0xAA); //get answer 1 byte from slave
+            printf("WHOAMI register = 0x%X\n\r", whoami1); 
+        // Deselect the device
+        chipSelect = 1;
+
+        ThisThread::sleep_for(5000);
+
+        chipSelect = 0;
+        //Send 0xAA, the command to read the WHOAMI register
+        whoami1 = spi.write(0xCC);
+            printf("WHOAMI register = 0x%X\n\r", whoami1);
+
+        //Deselect the device
+        chipSelect = 1;
+
+        ThisThread::sleep_for(5000);
     }
-    if(i== 1000){
-      printf("1000\n");
-    }
-    if(i== 10000){
-      printf("10000\n");
-    }
-    if(i== 4000000000){
-      printf("4000000000\n");
-    }
-  }
-}
-
-
-void for_th(){
-  flag_cancel_timeSignal=0;
-  // while(1){
-    
-    // ThisThread::get_id();
-    // queue.call(printf, "thread counting ThisThread::get_id() = %p\n", ThisThread::get_id());
-    uniqueID = queue.call(counting);
-    // queue.call(printf, "uniqueID = queue.call(counting); = %d\n", uniqueID);
-  // }
-
-}
-// void for_blink(){
-//   led=1;
-  // printf("========== for_blink() ==========================\n");
-  // queue3.call_every(50, led_inverse);
-  // if(flag_turnOFF_led){
-  //   queue3.break_dispatch();
-  // }
-  // queue3.dispatch();
-// }
-
-void for_th2(){
-  int32_t count=0;
-  while(1){
-    count++;
-    ThisThread::sleep_for(2000);
-    flag_cancel_timeSignal = true;
-    queue.call(printf, "count = %d\n", count+=10);
-    queue.call_every(50, led_inverse);
-    
-    // bool result_cancel = queue.cancel(uniqueID);
-    // queue.call(printf, "result_cancel = %d\n", result_cancel);
-
-    queue.call(printf, "thread led_inverse ThisThread::get_id() = %p\n", ThisThread::get_id());
-  
-    // queue.call(printf, "try cancel = %d\n", uniqueID);
-  }
-
-  // queue.call_every(50, led_inverse);
-}
-
-void swit(){
-  
-  int value = 0;
-
-  value = 100;
-    while(1){
-      switch (value)
-      {
-      case 100:
-        uniqueID = queue4.call(counting);
-        break;
-
-      case 200:
-        flag_cancel_timeSignal = true;
-        int countt = 0;
-        queue4.call(printf, "countt = %d\n", countt+=10);
-        break;
-
-      // case 300:
-      //   int counttt = 0;
-      //   queue4.call(printf, "counttt = %d\n", counttt+=1000);
-      //   break;
-
-      // default:
-      //   break;
-      }
-      ThisThread::sleep_for(5000);
-      printf( "hello arm\n");
-
-      value =200;
-  }
-}
-
-int main() {
-
-  printf("====================================\n");
-  #ifdef MBED_MAJOR_VERSION
-        printf("Mbed OS version: %d.%d.%d\n\n", MBED_MAJOR_VERSION, MBED_MINOR_VERSION, MBED_PATCH_VERSION);
-  #endif
-
-  // thread.start(for_th);
-
-  // thread2.start(for_th2);
-  // thread3.start(for_blink);
-
-  thread3.start(swit);
-
-  // queue.dispatch();
-  queue4.dispatch();
-  printf("===vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv====\n");
-
-    while(1){ 
-
-    }
-}
